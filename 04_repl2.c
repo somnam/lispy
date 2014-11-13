@@ -2,7 +2,7 @@
 #include <stdlib.h>
 
 #ifdef _linux
-#include <readline_fake.h>
+#include "lib/readline_fake.h"
 #else
 #include <editline/readline.h>
 #include <editline/history.h>
