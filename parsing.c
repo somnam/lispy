@@ -1,74 +1,83 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <math.h>
 #include <editline/readline.h>
 #include <editline/history.h>
 
 #include "lib/mpc.h"
+#include "lib/lval.h"
 
-long eval_op(long x, char* op, long y) {
+lval eval_op(lval x, char* op, lval y) { // {{{
+
+    // If either value is an error, return it.
+    if (x.type == LVAL_ERR || y.type == LVAL_ERR) {
+        return x.type == LVAL_ERR ? x : y;
+    }
 
     if (strcmp(op, "+") == 0
         || strcmp(op, "add") == 0
     ) {
-        x += y;
+        x = lval_num(x.num + y.num);
     } else if (
         strcmp(op, "-") == 0
         || strcmp(op, "sub") == 0
     ) {
-        x -= y;
+        x = lval_num(x.num - y.num);
     } else if (
         strcmp(op, "*") == 0
         || strcmp(op, "mul") == 0
     ) {
-        x *= y;
+        x = lval_num(x.num * y.num);
     } else if (
         strcmp(op, "/") == 0
         || strcmp(op, "div") == 0
     ) {
-        x /= y;
+        x = y.num == 0 ? lval_err(LERR_DIV_ZERO) : lval_num(x.num / y.num);
     } else if (
         strcmp(op, "%") == 0
         || strcmp(op, "mod") == 0
     ) {
-        x %= y;
+        x = lval_num(fmod(x.num, y.num));
     }
     else if (strcmp(op, "^") == 0) {
-        x = pow(x, y);
+        x = lval_num(pow(x.num, y.num));
     }
     else if (strcmp(op, "max") == 0) {
-        x = x > y ? x : y;
+        x = x.num > y.num ? x : y;
     }
     else if (strcmp(op, "min") == 0) {
-        x = x < y ? x : y;
+        x = x.num < y.num ? x : y;
     }
     else {
-        x = 0;
-    }
-
-    return x;
-}
-
-long eval_single_op(long x, char* op) { // {{{
-
-    if (strcmp(op, "-") == 0
-        || strcmp(op, "sub") == 0
-    ) {
-        x = -x;
+        x = lval_err(LERR_BAD_OP);
     }
 
     return x;
 } // }}}
 
-int eval(mpc_ast_t* t) {
+lval eval_single_op(lval x, char* op) { // {{{
+
+    if (strcmp(op, "-") == 0
+        || strcmp(op, "sub") == 0
+    ) {
+        x = lval_num(-x.num);
+    }
+
+    return x;
+} // }}}
+
+lval eval(mpc_ast_t* t) { // {{{
     /* Evaluate expression node */
 
     // If node is <number> - return value directly.
     // strstr - check if one string includes another.
     if (strstr(t->tag, "number")) {
         /* printf("Number: %s\n", t->contents); */
-        // atoi - converts char* to long.
+        // strtol - converts char* to double.
         // t->contents - node value.
-        return atoi(t->contents);
+        errno = 0;
+        double x = strtod(t->contents, NULL);
+        return errno != ERANGE ? lval_num(x) : lval_err(LERR_BAD_NUM);
     }
 
     // Node contains <operator> and <expr>.
@@ -77,7 +86,7 @@ int eval(mpc_ast_t* t) {
     /* printf("operator: %s\n", operator); */
 
     // Evaluate first <expr> child, so we have a starting point.
-    long result = eval(t->children[2]);
+    lval result = eval(t->children[2]);
 
     // Iterate remaining expressions.
     int i       = 3;
@@ -93,9 +102,9 @@ int eval(mpc_ast_t* t) {
     }
 
     return result;
-}
+} // }}}
 
-int main(int argc, char** argv) {
+int main(int argc, char** argv) { // {{{
     // Create Parsers.
     mpc_parser_t* Number         = mpc_new("number");
     mpc_parser_t* OperatorSymbol = mpc_new("operator_symbol");
@@ -132,8 +141,8 @@ int main(int argc, char** argv) {
         // Attempt to parse the user input.
         mpc_result_t r;
         if (mpc_parse("<stdin>", input, Lispy, &r)) {
-            long result = eval(r.output);
-            printf("%li\n", result);
+            lval result = eval(r.output);
+            lval_println(result);
             mpc_ast_delete(r.output);
         } else {
             // Print the error.
@@ -149,6 +158,6 @@ int main(int argc, char** argv) {
     mpc_cleanup(6, Number, OperatorSymbol, OperatorText, Operator, Expr, Lispy);
 
     return 0;
-}
+} // }}}
 
 

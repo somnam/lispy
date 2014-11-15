@@ -2,6 +2,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "readline_fake.h"
+
 static char buffer[2048];
 
 /* Fake readline function. */
