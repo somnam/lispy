@@ -7,6 +7,7 @@
 #include "lib/mpc.h"
 #include "lib/lval.h"
 
+/*
 lval eval_op(lval x, char* op, lval y) { // {{{
 
     // If either value is an error, return it.
@@ -67,13 +68,12 @@ lval eval_single_op(lval x, char* op) { // {{{
 } // }}}
 
 lval eval(mpc_ast_t* t) { // {{{
-    /* Evaluate expression node */
+    // Evaluate expression node.
 
     // If node is <number> - return value directly.
     // strstr - check if one string includes another.
     if (strstr(t->tag, "number")) {
-        /* printf("Number: %s\n", t->contents); */
-        // strtol - converts char* to double.
+        // strtod - converts char* to double.
         // t->contents - node value.
         errno = 0;
         double x = strtod(t->contents, NULL);
@@ -83,7 +83,7 @@ lval eval(mpc_ast_t* t) { // {{{
     // Node contains <operator> and <expr>.
     // The operator value is always the second child.
     char* operator = t->children[1]->contents;
-    /* printf("operator: %s\n", operator); */
+    // printf("operator: %s\n", operator);
 
     // Evaluate first <expr> child, so we have a starting point.
     lval result = eval(t->children[2]);
@@ -103,6 +103,7 @@ lval eval(mpc_ast_t* t) { // {{{
 
     return result;
 } // }}}
+*/
 
 int main(int argc, char** argv) { // {{{
     // Create Parsers.
@@ -110,6 +111,7 @@ int main(int argc, char** argv) { // {{{
     mpc_parser_t* OperatorSymbol = mpc_new("operator_symbol");
     mpc_parser_t* OperatorText   = mpc_new("operator_text");
     mpc_parser_t* Operator       = mpc_new("operator");
+    mpc_parser_t* Sexpr          = mpc_new("sexpr");
     mpc_parser_t* Expr           = mpc_new("expr");
     mpc_parser_t* Lispy          = mpc_new("lispy");
 
@@ -120,9 +122,10 @@ int main(int argc, char** argv) { // {{{
         " operator_text     : \"add\" | \"sub\" | \"mul\" | \"div\" | \"mod\" "
         "                   | \"max\" | \"min\" ;"
         " operator          : <operator_symbol> | <operator_text> ;"
-        " expr              : <number> | '(' <operator> <expr>+ ')' ;"
-        " lispy             : /^/ <operator> <expr>+ /$/ ;",
-        Number, OperatorSymbol, OperatorText, Operator, Expr, Lispy
+        " sexpr             : '(' <expr>* ')' ;"
+        " expr              : <number> | <operator> | <sexpr> ;"
+        " lispy             : /^/ <expr>* /$/ ;",
+        Number, OperatorSymbol, OperatorText, Operator, Sexpr, Expr, Lispy
     );
 
     // Print version and exit information.
@@ -141,8 +144,9 @@ int main(int argc, char** argv) { // {{{
         // Attempt to parse the user input.
         mpc_result_t r;
         if (mpc_parse("<stdin>", input, Lispy, &r)) {
-            lval result = eval(r.output);
+            lval* result = lval_read(r.output);
             lval_println(result);
+            lval_del(result);
             mpc_ast_delete(r.output);
         } else {
             // Print the error.
@@ -155,7 +159,10 @@ int main(int argc, char** argv) { // {{{
     }
 
     // Delete Parsers.
-    mpc_cleanup(6, Number, OperatorSymbol, OperatorText, Operator, Expr, Lispy);
+    mpc_cleanup(
+        7, 
+        Number, OperatorSymbol, OperatorText, Operator, Sexpr, Expr, Lispy
+    );
 
     return 0;
 } // }}}
