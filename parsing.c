@@ -7,104 +7,6 @@
 #include "lib/mpc.h"
 #include "lib/lval.h"
 
-/*
-lval eval_op(lval x, char* op, lval y) { // {{{
-
-    // If either value is an error, return it.
-    if (x.type == LVAL_ERR || y.type == LVAL_ERR) {
-        return x.type == LVAL_ERR ? x : y;
-    }
-
-    if (strcmp(op, "+") == 0
-        || strcmp(op, "add") == 0
-    ) {
-        x = lval_num(x.num + y.num);
-    } else if (
-        strcmp(op, "-") == 0
-        || strcmp(op, "sub") == 0
-    ) {
-        x = lval_num(x.num - y.num);
-    } else if (
-        strcmp(op, "*") == 0
-        || strcmp(op, "mul") == 0
-    ) {
-        x = lval_num(x.num * y.num);
-    } else if (
-        strcmp(op, "/") == 0
-        || strcmp(op, "div") == 0
-    ) {
-        x = y.num == 0 ? lval_err(LERR_DIV_ZERO) : lval_num(x.num / y.num);
-    } else if (
-        strcmp(op, "%") == 0
-        || strcmp(op, "mod") == 0
-    ) {
-        x = lval_num(fmod(x.num, y.num));
-    }
-    else if (strcmp(op, "^") == 0) {
-        x = lval_num(pow(x.num, y.num));
-    }
-    else if (strcmp(op, "max") == 0) {
-        x = x.num > y.num ? x : y;
-    }
-    else if (strcmp(op, "min") == 0) {
-        x = x.num < y.num ? x : y;
-    }
-    else {
-        x = lval_err(LERR_BAD_OP);
-    }
-
-    return x;
-} // }}}
-
-lval eval_single_op(lval x, char* op) { // {{{
-
-    if (strcmp(op, "-") == 0
-        || strcmp(op, "sub") == 0
-    ) {
-        x = lval_num(-x.num);
-    }
-
-    return x;
-} // }}}
-
-lval eval(mpc_ast_t* t) { // {{{
-    // Evaluate expression node.
-
-    // If node is <number> - return value directly.
-    // strstr - check if one string includes another.
-    if (strstr(t->tag, "number")) {
-        // strtod - converts char* to double.
-        // t->contents - node value.
-        errno = 0;
-        double x = strtod(t->contents, NULL);
-        return errno != ERANGE ? lval_num(x) : lval_err(LERR_BAD_NUM);
-    }
-
-    // Node contains <operator> and <expr>.
-    // The operator value is always the second child.
-    char* operator = t->children[1]->contents;
-    // printf("operator: %s\n", operator);
-
-    // Evaluate first <expr> child, so we have a starting point.
-    lval result = eval(t->children[2]);
-
-    // Iterate remaining expressions.
-    int i       = 3;
-    if (strstr(t->children[i]->tag, "expr")) {
-        while (strstr(t->children[i]->tag, "expr")) {
-            result = eval_op(result, operator, eval(t->children[i]));
-            i++;
-        }
-    }
-    // No further expressions, evaluate operator in single arguemtn context.
-    else {
-        result = eval_single_op(result, operator);
-    }
-
-    return result;
-} // }}}
-*/
-
 int main(int argc, char** argv) { // {{{
     // Create Parsers.
     mpc_parser_t* Number         = mpc_new("number");
@@ -144,7 +46,7 @@ int main(int argc, char** argv) { // {{{
         // Attempt to parse the user input.
         mpc_result_t r;
         if (mpc_parse("<stdin>", input, Lispy, &r)) {
-            lval* result = lval_read(r.output);
+            lval* result = lval_eval(lval_read(r.output));
             lval_println(result);
             lval_del(result);
             mpc_ast_delete(r.output);

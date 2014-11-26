@@ -168,3 +168,186 @@ void lval_print(lval* v) {
 // Print an lval followed by a newline.
 void lval_println(lval* v) { lval_print(v); putchar('\n'); }
 
+lval* eval_op(lval* a, lval* b, char* op) {
+    if (strcmp(op, "+") == 0
+        || strcmp(op, "add") == 0
+    ) {
+        /* x = lval_num(x.num + y.num); */
+        a->num += b->num;
+    } else if (
+        strcmp(op, "-") == 0
+        || strcmp(op, "sub") == 0
+    ) {
+        /* x = lval_num(x.num - y.num); */
+        a->num -= b->num;
+    } else if (
+        strcmp(op, "*") == 0
+        || strcmp(op, "mul") == 0
+    ) {
+        /* x = lval_num(x.num * y.num); */
+        a->num *= b->num;
+    } else if (
+        strcmp(op, "/") == 0
+        || strcmp(op, "div") == 0
+    ) {
+        /* x = y.num == 0 ? lval_err(LERR_DIV_ZERO) : lval_num(x.num / y.num); */
+        if (b->num == 0) {
+            lval_del(a);
+            a = lval_err(LERR_DIV_ZERO);
+        } else {
+            a->num /= b->num;
+        }
+    } else if (
+        strcmp(op, "%") == 0
+        || strcmp(op, "mod") == 0
+    ) {
+        /* x = lval_num(fmod(x.num, y.num)); */
+        a->num = fmod(a->num, b->num);
+    }
+    else if (strcmp(op, "^") == 0) {
+        /* x = lval_num(pow(x.num, y.num)); */
+        a->num = pow(a->num, b->num);
+    }
+    else if (strcmp(op, "max") == 0) {
+        /* x = x.num > y.num ? x : y; */
+        a->num = a->num > b->num ? a->num : b->num ;
+    }
+    else if (strcmp(op, "min") == 0) {
+        /* x = x.num < y.num ? x : y; */
+        a->num = a->num < b->num ? a->num : b->num;
+    }
+    else {
+        lval_del(a);
+        a = lval_err(LERR_BAD_OP);
+        /* x = lval_err(LERR_BAD_OP); */
+    }
+
+    return a;
+}
+
+lval* eval_single_op(lval* a, char* op) {
+    if (strcmp(op, "-") == 0
+        || strcmp(op, "sub") == 0
+    ) {
+        a->num = -a->num;
+    }
+
+    return a;
+}
+
+lval* lval_op_eval(lval* v, char* op) {
+    // Ensure all arguments are numbers.
+    for (int i = 0; i < v->len; i++) {
+        if (v->cell[i]->type != LVAL_NUM) {
+            lval_del(v);
+            return lval_err(LERR_BAD_NUM);
+        }
+    }
+
+    lval *a = NULL, *b = NULL;
+
+    // Iterate over each argument and apply operand.
+    while (v->len > 0) {
+        // First iteration, assign 'a' to first operand.
+        if (!a) {
+            a = lval_splice(v, 0);
+        }
+
+        // Assign 'b' to next operand, if available.
+        if (v->len > 0) {
+            b = lval_splice(v, 0);
+        }
+
+        if (b) {
+            // Evaluate 'a' and 'b' operands.
+            a = eval_op(a, b, op);
+        } else {
+            // 'a' is the only operand, run single op evaluation.
+            a = eval_single_op(a, op);
+        }
+
+        // Free 'b'.
+        lval_del(b);
+
+        // Break loop on error.
+        if (a->type != LVAL_NUM) {
+            break;
+        }
+    }
+
+    lval_del(v);
+
+    return a;
+}
+
+lval* lval_sexpr_eval(lval* v) {
+    // Evaluate children.
+    for (int i = 0; i < v->len; i++) {
+        v->cell[i] = lval_eval(v->cell[i]);
+    }
+
+    for (int i = 0; i < v->len; i++) {
+        if (v->cell[i]->type == LVAL_ERR) {
+            return lval_splice_del(v, i);
+        }
+    }
+
+    lval* result = NULL;
+    // Empty expression.
+    if (v->len == 0) {
+        result = v;
+    // Single expression.
+    } else if (v->len == 1) {
+        result = lval_splice_del(v, 0);
+    // Multiple expressions.
+    } else {
+        // Ensure that first element of expression is a symbol.
+        lval* first = lval_splice(v, 0);
+        if (first->type != LVAL_OP) {
+            lval_del(first);
+            lval_del(v);
+            return lval_err(LERR_BAD_OP);
+        }
+
+        // Call operator eval.
+        result = lval_op_eval(v, first->op);
+        lval_del(first);
+    }
+
+    return result;
+}
+
+lval* lval_eval(lval* v) {
+    // Evaluate S-Expressions. All other types remain the same.
+    return (v->type == (LVAL_SEXPR)) ? lval_sexpr_eval(v) : v;
+}
+
+lval* lval_splice(lval* v, int i) {
+    // Find the item at index.
+    lval* item = v->cell[i];
+
+    // Shift memory after the item at i over the top.
+    memmove(
+        // Destination place in memory, to wich we will copy ...
+        &v->cell[i],
+        // ... value at next list cell.
+        &v->cell[i+1],
+        // How much to copy?
+        (sizeof(lval*) * (v->len - i - 1))
+    );
+
+    // Decrease the count of items in the list.
+    v->len--;
+
+    // Reallocate the used memory.
+    v->cell = realloc(v->cell, sizeof(lval*) * v->len);
+
+    return item;
+}
+
+lval* lval_splice_del(lval* v, int i) {
+    lval* res = lval_splice(v, i);
+    lval_del(v);
+    return res;
+}
+
