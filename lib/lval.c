@@ -261,13 +261,13 @@ lval* lval_op_eval(lval* v, char* op) {
         if (b) {
             // Evaluate 'a' and 'b' operands.
             a = eval_op(a, b, op);
+
+            // Free 'b'.
+            lval_del(b);
         } else {
             // 'a' is the only operand, run single op evaluation.
             a = eval_single_op(a, op);
         }
-
-        // Free 'b'.
-        lval_del(b);
 
         // Break loop on error.
         if (a->type != LVAL_NUM) {
